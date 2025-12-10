@@ -66,7 +66,13 @@ app.use((req, res, next) => {
 
 // Initialize
 console.log('Initializing server...');
-testConnection();
+try {
+  testConnection();
+  console.log('✅ Database connection test passed');
+} catch (error) {
+  console.error('⚠️ Database connection test failed:', error.message);
+  // Don't crash the server if this fails
+}
 
 // ============================================
 // ROUTES (Keep all your existing routes)

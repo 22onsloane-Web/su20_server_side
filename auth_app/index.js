@@ -1,6 +1,5 @@
 // auth_app/index.js
 const admin = require('firebase-admin');
-const serviceAccount = require('../serviceAccountKey.json');
 const { 
   sendInvitationEmail, 
   sendApplicationApprovalEmail, 
@@ -10,25 +9,34 @@ const {
   sendUserRejectionNotification
 } = require('../utils/emailService');
 
+// ============================================
+// FIREBASE INITIALIZATION
+// ============================================
+
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
   // Check if running on Vercel (environment variable)
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.log('🔧 Using Firebase credentials from environment variable');
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
+    console.log('✅ Firebase Admin initialized from environment');
   } else {
     // Local development - use file
+    console.log('🔧 Using Firebase credentials from file');
     const serviceAccount = require('../serviceAccountKey.json');
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
+    console.log('✅ Firebase Admin initialized from file');
   }
 }
 
 const db = admin.firestore();
 const auth = admin.auth();
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -115,35 +123,16 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-// ============================================
-// USER STATUS FUNCTIONS
-// ============================================
-
-const checkUserStatus = async (req, res) => {
-  try {
-    const userDoc = await db.collection('users').doc(req.user.uid).get();
-    
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    const userData = userDoc.data();
-    
-    res.json({
-       uid: userData.uid,
-      email: userData.email,
-      displayName: userData.displayName,
-      phoneNumber: userData.phoneNumber, // ADD THIS LINE - it was missing
-      company: userData.company,
-      description: userData.description,
-      profilePicture: userData.profilePicture,
-      role: userData.role,
-      status: userData.status,
-      canAccess: userData.status === USER_STATUS.APPROVED
+// ⚠️ THIS WAS MISSING - ADDED NOW ⚠️
+const checkApproved = (req, res, next) => {
+  if (req.userData?.status !== USER_STATUS.APPROVED) {
+    return res.status(403).json({ 
+      error: 'Account pending approval',
+      status: req.userData?.status,
+      message: 'Your account is awaiting admin approval'
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
+  next();
 };
 
 const checkAdmin = (req, res, next) => {
@@ -165,6 +154,37 @@ const checkViewer = (req, res, next) => {
     return res.status(403).json({ error: 'Viewer access required' });
   }
   next();
+};
+
+// ============================================
+// USER STATUS FUNCTIONS
+// ============================================
+
+const checkUserStatus = async (req, res) => {
+  try {
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userData = userDoc.data();
+    
+    res.json({
+      uid: userData.uid,
+      email: userData.email,
+      displayName: userData.displayName,
+      phoneNumber: userData.phoneNumber,
+      company: userData.company,
+      description: userData.description,
+      profilePicture: userData.profilePicture,
+      role: userData.role,
+      status: userData.status,
+      canAccess: userData.status === USER_STATUS.APPROVED
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 // ============================================
@@ -228,8 +248,6 @@ const verifyRegistrationLink = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
-
 
 /**
  * Sign up user - UPDATED to notify admins
@@ -340,10 +358,6 @@ const signUpUser = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
-
-
-
 
 // ============================================
 // ADMIN FUNCTIONS
@@ -630,7 +644,6 @@ const uploadProfilePicture = async (req, res) => {
 /**
  * Send invitation email
  */
-
 const sendInviteEmail = async (req, res) => {
   try {
     const { email, registrationUrl, role } = req.body;
@@ -682,9 +695,8 @@ const sendInviteEmail = async (req, res) => {
 };
 
 // ============================================
-// ADJUDICATION FUNCTIONS (NEW)
+// ADJUDICATION FUNCTIONS
 // ============================================
-
 
 /**
  * Submit adjudicator review for an application with scoring
@@ -720,7 +732,7 @@ const submitAdjudicatorReview = async (req, res) => {
       }
     }
 
-     const adjudicatorId = req.user.uid;
+    const adjudicatorId = req.user.uid;
     const adjudicatorData = req.userData;
 
     // Calculate total score and percentage
@@ -728,9 +740,9 @@ const submitAdjudicatorReview = async (req, res) => {
     let scorePercentage = 0;
     
     if (scores) {
-  totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-  scorePercentage = Math.round((totalScore / 25) * 100); // <-- ADDED Math.round()
-}
+      totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
+      scorePercentage = Math.round((totalScore / 25) * 100);
+    }
 
     const existingReview = await db.collection('adjudications')
       .where('applicationId', '==', applicationId)
@@ -742,7 +754,7 @@ const submitAdjudicatorReview = async (req, res) => {
       adjudicatorId: adjudicatorId,
       adjudicatorName: adjudicatorData.displayName,
       adjudicatorEmail: adjudicatorData.email,
-      adjudicatorProfilePicture: adjudicatorData.profilePicture || '', // ADD THIS
+      adjudicatorProfilePicture: adjudicatorData.profilePicture || '',
       decision: decision.toLowerCase(),
       comments: comments,
       scores: scores || null,
@@ -809,9 +821,6 @@ const getMyReviews = async (req, res) => {
   }
 };
 
-/**
- * Get all reviews for a specific application (Admin only)
- */
 /**
  * Get all reviews for a specific application (Admin only)
  */
@@ -897,7 +906,6 @@ const getMyReviewForApplication = async (req, res) => {
   }
 };
 
-
 /**
  * Admin final approval of application
  */
@@ -922,7 +930,6 @@ const adminFinalApproval = async (req, res) => {
     });
 
     // Send approval email
-
     await sendApplicationApprovalEmail({
       email: applicantEmail,
       applicantName: applicantName,
@@ -964,7 +971,6 @@ const adminFinalRejection = async (req, res) => {
     });
 
     // Send rejection email
-
     await sendApplicationRejectionEmail({
       email: applicantEmail,
       applicantName: applicantName,
@@ -1012,7 +1018,6 @@ const getFinalDecision = async (req, res) => {
   }
 };
 
-
 /**
  * Get total number of adjudicators
  */
@@ -1051,7 +1056,7 @@ const getAllReviewCounts = async (req, res) => {
       success: true,
       counts: counts
     });
-    } catch (error) {
+  } catch (error) {
     console.error('Error fetching review counts:', error);
     res.status(500).json({ error: error.message });
   }
@@ -1080,24 +1085,18 @@ const getAllFinalDecisions = async (req, res) => {
   }
 };
 
-
-
 // ============================================
 // EXPORTS
 // ============================================
 
-
 module.exports = {
-  // Initialize
-  //initializeFirebase,
-  
   // Constants
   ROLES,
   USER_STATUS,
   
   // Middleware
   verifyToken,
-  checkApproved,
+  checkApproved,     // ✅ NOW PROPERLY DEFINED AND EXPORTED
   checkAdmin,
   checkAdjudicator,
   checkViewer,
@@ -1129,30 +1128,24 @@ module.exports = {
   getAdjudicationData,
   sendInviteEmail,
 
-  // Firebase instances
-
-
-  // ============================================
-// ADJUDICATION FUNCTIONS (NEW)
-// ============================================
+  // Adjudication Functions
   submitAdjudicatorReview,
   getMyReviews,
   getApplicationReviews,
   getMyReviewForApplication,
 
-   // Admin Final Decision Functions
+  // Admin Final Decision Functions
   adminFinalApproval,
   adminFinalRejection,
   getFinalDecision,
 
-   getTotalAdjudicators,
+  // Statistics
+  getTotalAdjudicators,
   getAllReviewCounts,
   getAllFinalDecisions,
-    
 
-
+  // Firebase instances
   db,
   auth,
   admin
-
 };
