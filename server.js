@@ -134,6 +134,78 @@ app.get('/api/admin/all-final-decisions',
 app.get('/api/profile/:userId', authApp.verifyToken, authApp.checkApproved, authApp.getUserProfile);
 app.put('/api/profile/:userId', authApp.verifyToken, authApp.checkApproved, authApp.updateUserProfile);
 app.post('/api/profile/:userId/picture', authApp.verifyToken, authApp.checkApproved, authApp.uploadProfilePicture);
+
+
+
+
+
+
+
+// ============================================
+// TOKEN DEBUG ENDPOINT - Add before error handlers
+// ============================================
+app.post('/api/test-token', async (req, res) => {
+  console.log('\n🔍 === TOKEN TEST ENDPOINT ===');
+  
+  try {
+    const authHeader = req.headers.authorization;
+    console.log('1. Auth header:', authHeader ? 'Present' : 'Missing');
+    
+    if (!authHeader) {
+      return res.json({ 
+        success: false,
+        error: 'No Authorization header',
+        hint: 'Add header: { "Authorization": "Bearer YOUR_TOKEN" }'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.json({ 
+        success: false,
+        error: 'Missing Bearer prefix',
+        received: authHeader.substring(0, 20)
+      });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    console.log('2. Token length:', token?.length);
+    
+    const decodedToken = await authApp.auth.verifyIdToken(token);
+    console.log('3. ✅ Token valid!');
+    console.log('   - Email:', decodedToken.email);
+    console.log('   - UID:', decodedToken.uid);
+    
+    res.json({ 
+      success: true,
+      message: 'Token is valid',
+      email: decodedToken.email,
+      uid: decodedToken.uid
+    });
+    
+  } catch (error) {
+    console.log('❌ Token verification failed');
+    console.log('   - Code:', error.code);
+    console.log('   - Message:', error.message);
+    
+    res.json({ 
+      success: false,
+      error: error.message,
+      code: error.code
+    });
+  }
+  
+  console.log('=== END TEST ===\n');
+});
+
+
+
+
+
+
+
+
+
+
 // Error handlers
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);

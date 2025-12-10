@@ -83,18 +83,26 @@ const verifyToken = async (req, res, next) => {
     console.log('ERROR during token verification:');
     console.log('   - Error code:', error.code);
     console.log('   - Error message:', error.message);
+    console.log('   - Full error:', JSON.stringify(error, null, 2));
+    console.log('   - Token length:', token ? token.length : 'no token');
+    console.log('   - Token preview:', token ? token.substring(0, 30) + '...' : 'none');
+    
+    // Helpful hints
+    if (error.code === 'auth/id-token-expired') {
+      console.log('   💡 HINT: Token expired - client needs to call getIdToken(true)');
+    } else if (error.code === 'auth/argument-error') {
+      console.log('   💡 HINT: Invalid token format - check Bearer prefix');
+    } else if (error.code === 'auth/project-not-found') {
+      console.log('   💡 HINT: Firebase project mismatch - check serviceAccountKey.json');
+    }
+    
     console.log('=== END DEBUG ===\n');
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-const checkApproved = (req, res, next) => {
-  if (req.userData?.status !== USER_STATUS.APPROVED) {
-    return res.status(403).json({ 
-      error: 'Account pending approval',
-      status: req.userData?.status 
+    return res.status(401).json({ 
+      error: 'Invalid token',
+      errorCode: error.code,
+      errorMessage: error.message
     });
   }
-  next();
 };
 
 // ============================================
