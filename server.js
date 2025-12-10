@@ -9,17 +9,54 @@ const authApp = require('./auth_app');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ============================================
+// CORS CONFIGURATION - UPDATED FOR VERCEL
+// ============================================
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://msme-awards-adjudication-admin.vercel.app',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:3000'
+    ];
+    
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('⚠️ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 // Middleware
-app.use(cors({
-  origin: ['https://msme-awards-adjudication-admin.vercel.app', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
 app.use(express.json());
+
+// Log all requests (helpful for debugging)
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
+  next();
+});
 
 // Initialize data on startup
 console.log('Initializing server...');
 testConnection();
+
+
 
 // Health check
 app.get('/', (req, res) => {
