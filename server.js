@@ -17,43 +17,16 @@ const corsOptions = {
     'https://msme-awards-adjudication-admin.vercel.app',
     'http://localhost:3001',
     'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:3000'
+    'http://localhost:5174'
   ],
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'] 
 };
 
-// Apply CORS to all routes
 app.use(cors(corsOptions));
-
-// Explicitly handle OPTIONS for all routes
 app.options('*', cors(corsOptions));
-
-// Additional manual CORS headers as backup
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'https://msme-awards-adjudication-admin.vercel.app',
-    'http://localhost:3001',
-    'http://localhost:5173',
-    'http://localhost:5174'
-  ];
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  next();
-});
-
-// Body parser
 app.use(express.json());
 
 // Logging
