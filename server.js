@@ -10,8 +10,38 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// CORS CONFIGURATION - AGGRESSIVE MODE
+// CORS - BULLETPROOF FOR VERCEL
 // ============================================
+
+// Step 1: Manual CORS headers (runs BEFORE cors package)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://msme-awards-adjudication-admin.vercel.app',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ];
+  
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight immediately
+  if (req.method === 'OPTIONS') {
+    console.log('✅ Preflight request for:', req.url, 'from:', origin);
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
+// Step 2: Use cors package as backup
 const corsOptions = {
   origin: [
     'https://msme-awards-adjudication-admin.vercel.app',
@@ -20,13 +50,12 @@ const corsOptions = {
     'http://localhost:5174'
   ],
   credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'] 
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+
+// Parse JSON
 app.use(express.json());
 
 // Logging
@@ -40,7 +69,7 @@ console.log('Initializing server...');
 testConnection();
 
 // ============================================
-// ROUTES
+// ROUTES (Keep all your existing routes)
 // ============================================
 
 // Health check
