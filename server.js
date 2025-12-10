@@ -10,53 +10,59 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// CORS CONFIGURATION - VERCEL COMPATIBLE
+// CORS CONFIGURATION - AGGRESSIVE MODE
 // ============================================
-const allowedOrigins = [
-  'https://msme-awards-adjudication-admin.vercel.app',
-  'http://localhost:3001',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000'
-];
+const corsOptions = {
+  origin: [
+    'https://msme-awards-adjudication-admin.vercel.app',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
 
-// CORS Middleware
+// Apply CORS to all routes
+app.use(cors(corsOptions));
+
+// Explicitly handle OPTIONS for all routes
+app.options('*', cors(corsOptions));
+
+// Additional manual CORS headers as backup
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://msme-awards-adjudication-admin.vercel.app',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ];
   
-  // Allow requests with no origin (like mobile apps, curl, Postman)
-  if (!origin) {
-    return next();
-  }
-  
-  // Check if origin is allowed
   if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  } else {
-    console.log('❌ CORS blocked origin:', origin);
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
   }
   
-  // Handle preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
   next();
 });
 
-// Body parser middleware
+// Body parser
 app.use(express.json());
 
-// Request logging (helpful for debugging)
+// Logging
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
+  console.log(`${req.method} ${req.url} - Origin: ${req.headers.origin || 'none'}`);
   next();
 });
 
-// Initialize data on startup
+// Initialize
 console.log('Initializing server...');
 testConnection();
 
@@ -74,23 +80,26 @@ app.get('/', (req, res) => {
   });
 });
 
+// Test CORS endpoint
+app.get('/api/test-cors', (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'CORS is working!',
+    origin: req.headers.origin
+  });
+});
+
 // Competition data routes
 app.use('/api/competition-data', competitionDataRouter);
 
-// ============================================
 // AUTH PUBLIC ROUTES
-// ============================================
 app.get('/api/verify-registration-link/:token', authApp.verifyRegistrationLink);
 app.post('/api/signup', authApp.signUpUser);
 
-// ============================================
 // AUTH AUTHENTICATED ROUTES
-// ============================================
 app.post('/api/check-user-status', authApp.verifyToken, authApp.checkUserStatus);
 
-// ============================================
 // AUTH ADMIN ROUTES
-// ============================================
 app.post('/api/admin/generate-registration-link', 
   authApp.verifyToken, 
   authApp.checkApproved, 
@@ -147,9 +156,7 @@ app.get('/api/admin/application-reviews/:applicationId',
   authApp.getApplicationReviews
 );
 
-// ============================================
 // AUTH ADJUDICATOR ROUTES
-// ============================================
 app.get('/api/adjudicator/applications', 
   authApp.verifyToken, 
   authApp.checkApproved, 
@@ -192,9 +199,7 @@ app.get('/api/adjudicator/my-review/:applicationId',
   authApp.getMyReviewForApplication
 );
 
-// ============================================
 // AUTH VIEWER ROUTES
-// ============================================
 app.get('/api/viewer/adjudication-data', 
   authApp.verifyToken, 
   authApp.checkApproved, 
@@ -202,9 +207,7 @@ app.get('/api/viewer/adjudication-data',
   authApp.getAdjudicationData
 );
 
-// ============================================
 // INVITATION ROUTES
-// ============================================
 app.post('/api/admin/send-invite', 
   authApp.verifyToken, 
   authApp.checkApproved, 
@@ -212,9 +215,7 @@ app.post('/api/admin/send-invite',
   authApp.sendInviteEmail
 );
 
-// ============================================
 // ADMIN FINAL DECISION ROUTES
-// ============================================
 app.post('/api/admin/final-approval',
   authApp.verifyToken,
   authApp.checkApproved,
@@ -236,9 +237,7 @@ app.get('/api/admin/final-decision/:applicationId',
   authApp.getFinalDecision
 );
 
-// ============================================
 // PROFILE ROUTES
-// ============================================
 app.get('/api/profile/:userId', 
   authApp.verifyToken, 
   authApp.checkApproved, 
@@ -257,11 +256,7 @@ app.post('/api/profile/:userId/picture',
   authApp.uploadProfilePicture
 );
 
-// ============================================
 // ERROR HANDLERS
-// ============================================
-
-// 404 handler - must be after all routes
 app.use((req, res) => {
   console.log('404 - Route not found:', req.method, req.url);
   res.status(404).json({ 
@@ -272,7 +267,6 @@ app.use((req, res) => {
   });
 });
 
-// Error handler - must be last
 app.use((err, req, res, next) => {
   console.error('Server Error:', err.message);
   console.error('Stack:', err.stack);
@@ -284,17 +278,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ============================================
-// START SERVER
-// ============================================
+// START SERVER (only in non-production)
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`\n🚀 Server running on http://localhost:${PORT}`);
     console.log('📊 API: /api/competition-data');
     console.log('🔐 Auth: /api/admin, /api/adjudicator, /api/viewer');
-    console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
-    console.log('✅ CORS enabled for:');
-    allowedOrigins.forEach(origin => console.log(`   - ${origin}`));
     console.log('');
   });
 }
